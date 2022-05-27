@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-server
+  labels:
+    app: auth-server
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-server
+  # strategy:
+  #   type: RollingUpdate
+  #   rollingUpdate:
+  #     maxSurge: 25%
+  #     maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: auth-server
+    spec:
+      containers:
+      - image: 060701521359.dkr.ecr.ap-northeast-2.amazonaws.com/pj4-auth:latest
+        imagePullPolicy: Always
+        name: auth-server
+        ports:
+            - containerPort: 3005
+              protocol: TCP
