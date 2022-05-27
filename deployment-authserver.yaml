@@ -6,7 +6,7 @@ metadata:
     app: auth-server
   namespace: default
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: auth-server
@@ -21,9 +21,17 @@ spec:
         app: auth-server
     spec:
       containers:
-      - image: 060701521359.dkr.ecr.ap-northeast-2.amazonaws.com/pj4-auth:latest
+      - image: vnfmsqkek3/auth-server:latest
         imagePullPolicy: Always
         name: auth-server
         ports:
-            - containerPort: 3005
+            - containerPort: 80
+              protocol: TCP
+    spec:
+      containers:
+      - image: redis:latest
+        imagePullPolicy: Always
+        name: redis
+        ports:
+            - containerPort: 6379
               protocol: TCP
