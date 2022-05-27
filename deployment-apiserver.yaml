@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-server
+  labels:
+    app: api-server
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-server
+  # strategy:
+  #   type: RollingUpdate
+  #   rollingUpdate:
+  #     maxSurge: 25%
+  #     maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: api-server
+    spec:
+      containers:
+      - image: 060701521359.dkr.ecr.ap-northeast-2.amazonaws.com/project4-rep:95f0aa4f2c8460e2385d61c9cb0eadb154adbb0e
+        imagePullPolicy: Always
+        name: api-server
+        ports:
+            - containerPort: 80
+              protocol: TCP
