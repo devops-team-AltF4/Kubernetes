@@ -8,6 +8,7 @@ spec:
   type: NodePort 
   ports: 
   - name: http 
-    port: 80 
-    protocol: TCP 
-    targetPort: 80
+    port: 80
+    protocol: TCP
+    targetPort: 3005
+  
