@@ -6,22 +6,23 @@ metadata:
     app: auth-server
   namespace: default
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: auth-server
-  # strategy:
-  #   type: RollingUpdate
-  #   rollingUpdate:
-  #     maxSurge: 25%
-  #     maxUnavailable: 25%
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
   template:
     metadata:
       labels:
         app: auth-server
     spec:
+      shareProcessNamespace: true
       containers:
-      - image: 060701521359.dkr.ecr.ap-northeast-2.amazonaws.com/pj4-auth:latest
+      - image: vnfmsqkek3/auth-server:latest
         imagePullPolicy: Always
         name: auth-server
         ports:

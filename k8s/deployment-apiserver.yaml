@@ -6,7 +6,7 @@ metadata:
     app: api-server
   namespace: default
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: api-server
@@ -21,9 +21,9 @@ spec:
         app: api-server
     spec:
       containers:
-      - image: 060701521359.dkr.ecr.ap-northeast-2.amazonaws.com/project4-rep:95f0aa4f2c8460e2385d61c9cb0eadb154adbb0e
+      - image: 060701521359.dkr.ecr.ap-northeast-2.amazonaws.com/project4-staging:latest
         imagePullPolicy: Always
         name: api-server
         ports:
-            - containerPort: 80
+            - containerPort: 3000
               protocol: TCP

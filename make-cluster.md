@@ -10,3 +10,12 @@ eksctl create cluster \
 
 //delete
 eksctl delete cluster --name=project4-staging
+
+
+eksctl create cluster \
+--name cluster-1 \
+--version 1.21 \
+--region us-west-2 \
+--nodegroup-name c1-nodes \
+--node-type t3.medium \
+--nodes 2

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata: 
+  name: auth-server
+  namespace: default
+spec: 
+  selector: 
+    app: auth-server
+  type: NodePort 
+  ports: 
+  - name: http 
+    port: 80
+    protocol: TCP
+    targetPort: 3005
+  
