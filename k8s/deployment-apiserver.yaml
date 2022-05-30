@@ -21,7 +21,7 @@ spec:
         app: api-server
     spec:
       containers:
-      - image: 060701521359.dkr.ecr.ap-northeast-2.amazonaws.com/project4-staging:latest
+      - image: 060701521359.dkr.ecr.ap-northeast-2.amazonaws.com/pj4-auth:latest
         imagePullPolicy: Always
         name: api-server
         ports:

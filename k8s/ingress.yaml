@@ -15,9 +15,9 @@ spec:
           - path: /
             backend:
               serviceName: api-server
-              servicePort: 443
+              servicePort: 80
           - path: /auth
             backend:
               serviceName: auth-server
-              servicePort: 443
+              servicePort: 80
           
