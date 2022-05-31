@@ -1,0 +1,24 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: staging
+  region: ap-northeast-2
+  version: "1.21"
+
+nodeGroups:
+  - name: staging
+    instanceType: t3.large
+    desiredCapacity: 1
+    privateNetworking: true
+    iam:
+      withAddonPolicies:
+        imageBuilder: true # Amazon ECR에 대한 권한 추가
+        albIngress: true  # albIngress에 대한 권한 추가
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess
+    ssh:
+      publicKeyPath: ~/.ssh/id_rsa.pub

@@ -1,0 +1,136 @@
+1. ekctl 설치 : https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/eksctl.html
+1-1. ekctl 다운
+   curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+
+1-2. 압축 해제된 이진파일 옮기기
+   sudo mv /tmp/eksctl /usr/local/bin
+
+1-3. 버전확인
+    eksctl version
+
+2. eks 클러스터 및 노드 생성 : https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/getting-started-eksctl.html
+2-1. 생성(생성되는데 시간이 조금 걸림)
+    eksctl create cluster --name staging --region ap-northeast-2
+    (eksctl create cluster --name my-cluster --region region-code)
+
+2-2. 리소스 보기(클러스터 노드 확인)
+    kubectl get nodes -o wide
+
+2-3. 클러스터에 실행중인 워크로드 확인
+    kubectl get pods --all-namespaces -o wide
+
+2-4. 클러스터와 통신
+aws eks update-kubeconfig --region region-code --name my-cluster
+
+3. AWS Load Balancer Controller 설치 : https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/aws-load-balancer-controller.html
+   
+3-1. IAM 정책 생성
+    curl -o iam_policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.4.0/docs/install/iam_policy.json
+
+3-2. IAM 정책 만들기
+    aws iam create-policy \
+    --policy-name AWSLoadBalancerControllerIAMPolicy \
+    --policy-document file://iam_policy.json
+
+3-3. eksctl을 이용해 kubectl을 사용하여 IAM 역할을 생성하고 AWS 로드 밸런서 컨트롤러의 kube-system 네임스페이스에 aws-load-balancer-controller라는 Kubernetes 서비스 계정을 추가
+
+
+    eksctl create iamserviceaccount \
+    --cluster=staging \
+    --namespace=kube-system \
+    --name=aws-load-balancer-controller \
+    --attach-policy-arn=arn:aws:iam::060701521359:policy/AWSLoadBalancerControllerIAMPolicy \
+    --approve
+
+    (eksctl create iamserviceaccount \
+    --cluster=my-cluster \
+    --namespace=kube-system \
+    --name=aws-load-balancer-controller \
+    --attach-policy-arn=arn:aws:iam::111122223333:policy/AWSLoadBalancerControllerIAMPolicy \
+    --override-existing-serviceaccounts \
+    --approve)
+
+    //no IAM OIDC provider associated with cluster란 문구가 뜨면 try 뒤 부터 복사한다음 --approve를 붙여서 실행 후 위 명령어 다시 실행
+    eksctl utils associate-iam-oidc-provider --region=ap-northeast-2 --cluster=staging --approve
+
+4. helm을 사용하여 AWS Load Balancer Controller 설치 
+   
+4-1. eks-charts 리포지토리 추가
+    helm repo add eks https://aws.github.io/eks-charts
+
+4-2. 최신 차트가 적용되도록 로컬 리포지토리를 업데이트
+    helm repo update
+
+4-3. aws 로드밸런서 컨트롤러 설치
+
+    helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+    -n default \
+    --set clusterName=staging \
+    --set serviceAccount.create=false \
+    --set serviceAccount.name=aws-load-balancer-controller 
+
+    ( helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+    -n kube-system \
+    --set clusterName=cluster-name \
+    --set serviceAccount.create=false \
+    --set serviceAccount.name=aws-load-balancer-controller )
+
+4-4. 다음과 같이 떠야함
+    > kubectl get deployment -n kube-system aws-load-balancer-controller
+        NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+        aws-load-balancer-controller   2/2     2            2           47s
+
+5. 서브넷 -> public, private 태그 추가
+   
+    키 - kubernetes.io/cluster/pj4-staging
+    값 - shared 또는 owned
+
+    (키 - kubernetes.io/cluster/cluster-name)
+    (값 - shared 또는 owned)
+
+5-1. 프라이빗 서브넷에 태그 추가
+
+    키 - kubernetes.io/role/internal-elb
+    값 - 1
+
+5-2. 퍼블릭 서브넷에 태그 추가
+
+    키 - kubernetes.io/role/elb
+    값 - 1
+
+6. 클러스터에 대한 IAM 사용자 및 역할 액세스 사용 설정 : https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/add-user-role.html
+
+    curl -o eks-console-full-access.yaml https://amazon-eks.s3.us-west-2.amazonaws.com/docs/eks-console-full-access.yaml
+    kubectl apply -f eks-console-full-access.yaml
+
+
+##################클러스터 구성시 꼭 필수######################
+https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/getting-started-console.html
+
+
+https://aws.amazon.com/ko/premiumsupport/knowledge-center/eks-alb-ingress-controller-setup/
+
+
+이거면 끝
+https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/deploy/installation/
+
+503에러났을때
+https://dev.wisedog.net/2020/03/13/%EA%B0%99%EC%9D%80-VPC%EC%9D%B8%EB%8D%B0%EB%8F%84-EKS%EC%97%90%EC%84%9C-RDS-%EC%97%B0%EA%B2%B0-%EC%95%88%EB%90%A0-%EA%B2%BD%EC%9A%B0/
+https://dev.wisedog.net/categories/AWS/k8s/
+
+
+kubectl describe ingress apiserver
+
+kubectl get ns 
+
+kubectl delete ingress ( +ingress name)
+
+redis파드 잘 살아있나?
+kubectl exec -it redis -- redis-cli
+
+//헬름
+--set enableWaf=false --set enableWaf2=false --set enableShield=false
+
+--enable-shield=false --enable-waf=false --enable-wafv2=false
+
+kubectl logs 파드이름

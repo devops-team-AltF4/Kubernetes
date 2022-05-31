@@ -1,23 +1,32 @@
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: apiserver
+  name: project4
   namespace: default
   annotations:
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/group.name: myalb
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80,"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/group.name: project4--staging
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:060701521359:certificate/104f70c8-4cbb-4873-aed9-eb9bfbeeb021
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:ap-northeast-2:060701521359:regional/webacl/project4/881a401f-aed7-4710-a3e7-44757a18cdb7
 spec:
   rules:
-    - http:
-        paths:
-          - path: /
-            backend:
-              serviceName: api-server
-              servicePort: 80
-          - path: /auth
-            backend:
-              serviceName: auth-server
-              servicePort: 80
-          
+  - host: "*.amazonaws.com"
+    http:
+      paths:
+      - path: /auth
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-server
+            port:
+              number: 80
+
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-server
+            port:
+              number: 80

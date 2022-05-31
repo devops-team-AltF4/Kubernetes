@@ -22,7 +22,7 @@ spec:
     spec:
       shareProcessNamespace: true
       containers:
-      - image: 060701521359.dkr.ecr.ap-northeast-2.amazonaws.com/pj4-auth:latest
+      - image: vnfmsqkek3/auth-server:latest
         imagePullPolicy: Always
         name: auth-server
         ports:

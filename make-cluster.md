@@ -19,3 +19,6 @@ eksctl create cluster \
 --nodegroup-name c1-nodes \
 --node-type t3.medium \
 --nodes 2
+
+
+eksctl create cluster -f cluster.yaml
