@@ -9,10 +9,9 @@ metadata:
     alb.ingress.kubernetes.io/group.name: project4--staging
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:060701521359:certificate/104f70c8-4cbb-4873-aed9-eb9bfbeeb021
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
-    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:ap-northeast-2:060701521359:regional/webacl/project4/881a401f-aed7-4710-a3e7-44757a18cdb7
 spec:
   rules:
-  - host: "*.amazonaws.com"
+  - host: "eks.devops-altf4.click"
     http:
       paths:
       - path: /auth
