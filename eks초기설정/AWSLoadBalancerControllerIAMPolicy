@@ -134,3 +134,16 @@ kubectl exec -it redis -- redis-cli
 --enable-shield=false --enable-waf=false --enable-wafv2=false
 
 kubectl logs 파드이름
+
+
+namespace 삭제
+kubectl delete ns 네임스페이스이름
+
+서비스보기
+kubectl get svc
+
+그라파나 설치(alb)
+https://incredible.ai/kubernetes/2020/09/08/Prometheus_And_Grafana/
+
+그라파나 모니터링(3131, 3146)
+https://awskrug.github.io/eks-workshop/monitoring/dashboards/
