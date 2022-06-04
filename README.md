@@ -124,20 +124,22 @@ aws eks update-kubeconfig --region region-code --name my-cluster
     curl -o iam_policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.4.0/docs/install/iam_policy.json
 
 3-2. IAM 정책 만들기
+```
     aws iam create-policy \
     --policy-name AWSLoadBalancerControllerIAMPolicy \
     --policy-document file://iam_policy.json
-
+```
 3-3. eksctl을 이용해 kubectl을 사용하여 IAM 역할을 생성하고 AWS 로드 밸런서 컨트롤러의 kube-system 네임스페이스에 aws-load-balancer-controller라는 Kubernetes 서비스 계정을 추가
 
-
+```
     eksctl create iamserviceaccount \
     --cluster=staging \
     --namespace=kube-system \
     --name=aws-load-balancer-controller \
     --attach-policy-arn=arn:aws:iam::060701521359:policy/AWSLoadBalancerControllerIAMPolicy \
     --approve
-
+```
+```
     (eksctl create iamserviceaccount \
     --cluster=my-cluster \
     --namespace=kube-system \
@@ -145,37 +147,41 @@ aws eks update-kubeconfig --region region-code --name my-cluster
     --attach-policy-arn=arn:aws:iam::111122223333:policy/AWSLoadBalancerControllerIAMPolicy \
     --override-existing-serviceaccounts \
     --approve)
-
+```
     //no IAM OIDC provider associated with cluster란 문구가 뜨면 try 뒤 부터 복사한다음 --approve를 붙여서 실행 후 위 명령어 다시 실행
+    ```
     eksctl utils associate-iam-oidc-provider --region=ap-northeast-2 --cluster=staging --approve
-
+```
 4. helm을 사용하여 AWS Load Balancer Controller 설치 
    
 4-1. eks-charts 리포지토리 추가
+```
     helm repo add eks https://aws.github.io/eks-charts
-
+```
 4-2. 최신 차트가 적용되도록 로컬 리포지토리를 업데이트
     helm repo update
 
 4-3. aws 로드밸런서 컨트롤러 설치
-
+```
     helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
     -n default \
     --set clusterName=staging \
     --set serviceAccount.create=false \
     --set serviceAccount.name=aws-load-balancer-controller 
-
+```
+```
     ( helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
     -n kube-system \
     --set clusterName=cluster-name \
     --set serviceAccount.create=false \
     --set serviceAccount.name=aws-load-balancer-controller )
-
+```
 4-4. 다음과 같이 떠야함
+```
     > kubectl get deployment -n kube-system aws-load-balancer-controller
         NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
         aws-load-balancer-controller   2/2     2            2           47s
-
+```
 5. 서브넷 -> public, private 태그 추가
    
     키 - kubernetes.io/cluster/pj4-staging
@@ -195,21 +201,22 @@ aws eks update-kubeconfig --region region-code --name my-cluster
     값 - 1
 
 6. 클러스터에 대한 IAM 사용자 및 역할 액세스 사용 설정 : https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/add-user-role.html
-
+```
     curl -o eks-console-full-access.yaml https://amazon-eks.s3.us-west-2.amazonaws.com/docs/eks-console-full-access.yaml
     kubectl apply -f eks-console-full-access.yaml
-
-6-2. 사용자 추가 (마스터권한)
+```
+6-2. 사용자 추가 RBAC(마스터권한)
+```
    eksctl create iamidentitymapping \
   --cluster 클러스터이름 \
   --arn arn:aws:iam::xxxxxxxxxxxx:user/유저이름 \
   --username 유저이름 \
   --group system:masters
-
+```
 6-3. 확인
-
+```
     eksctl get iamidentitymapping --cluster eksworkshop-eksctl
-    
+``` 
 6-4. 사용자 추가에 관한 내용은 아래 블로그에 정리해 두었습니다.
 
     https://mtou.tistory.com/132
