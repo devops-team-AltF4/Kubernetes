@@ -365,8 +365,28 @@ https://gist.github.com/hrdtbs/ba50868d7d608b89f958fe32dc35fdd4
 **본 레파지토리 처럼 k8s안에 deployment, service, ingress 들을 넣어넣고 생성하시길 바랍니다. argoCD에서 path설정할 때 레파지토리 안의 폴더만 볼 수 있게 등록하기 위함입니다. **
 
 
+## namespace
+ 
+ ```
+$ kubectl get all 
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   55d
+$ kubectl get all -o wide
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   55d   <none>
+$ kubectl get all -o wide -n default
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   55d   <none>
+-n 은 네임스페이스 약자로 네임스페이스를 지정하는 옵션
+ 
+ ```
+namespace 내 같은 이름의 파드는 불가능 하며 다른 네임스페이스라면 같은 이름의 파드를 생성할 수 있습니다.
+ 
+Namespaces 란 동일한 물리 클러스터를 기반으로 하는 여러 가상 클러스터를 지원하며, 이런 가상 클러스터를 네임스페이스라고 합니다.
 
-
+쿠버네티스 클러스터내에서 논리적인 분리 단위 이며 쿠버네티스의 Namespace 별로 리소스를 구분되어 있습니다.
+ 
+ 
 
 ## clean UP
 eksctl delete cluster --name 클러스터이름 --region ap-northeast-2
