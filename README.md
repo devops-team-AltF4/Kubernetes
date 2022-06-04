@@ -298,6 +298,30 @@ Session Affinity:  None
 Events:            <none>
 ```
 ``` kubectl describe service redis-service ``` describe 명령어를 입력해서 얻은 endpoint 주소를 auth 서버에 host로 넣어줍니다.
+ 
+ 혹은 다음과 같이 찾을 수 있습니다.
+ ```
+ > kubectl get endpoints
+NAME         ENDPOINTS           AGE
+kubernetes   192.168.49.2:8443   54m
+redis        172.17.0.3:6379     22s
+```
+ 
+이때 redis의 endpoint는 바뀔 수 있으니 endpoint를 고정시켜줄 수 있습니다.
+ ```
+ //redis-endpoint.yaml
+ apiVersion: v1
+kind: Endpoints
+metadata:
+  # the name here should match the name of the Service
+  name: redis
+subsets:
+  - addresses:
+      - ip: 원하는 IP 주소
+    ports:
+      - port: 6379
+```
+ 
 
 ```
 # auth-server/app.js
