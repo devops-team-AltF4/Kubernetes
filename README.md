@@ -1,8 +1,21 @@
 # EKS
 
+## 프로젝트 설명
+AWS에서 제공하는 쿠버네티스 환경 Amazon Elastic Kubernetes Service(Amazon EKS)에서 클러스터와 노드를 구성합니다.
+Github main branch에 푸쉬하게 되면 ArgoCD가 Pull해와서 Kubernetes에 애플리케이션을 배포하게 됩니다.
+본 프로젝트에서는 EKS 사용법과 Ingress로 ALB를 설정할 때 겪은 트러블 슈팅, Auth Server와 Redis를 연결시켜주는 방법, kubectl 관련 명령어, 사용자 추가 방법 들을 
+알아보고 적용시켜 staging 환경에서의 EKS를 구성하는 것이 목표입니다.
+
+## 아키텍쳐
+
+![image](https://user-images.githubusercontent.com/50416571/171988310-031d53b2-dd20-45e0-be20-65d4964adaaa.png)
+
+
+
 ## USE
 1. Kubernetes
-* EKS
+* EKS (Kubernetes 버전 1.21)
+  * node (t3.large 35)
   
 2. CD tool
 * ArgoCD
@@ -36,15 +49,15 @@
 ```
 ## Project Explanation
 
-## Step
-1. EKS로 클러스터와 노드를 생성한다.
-2. deploymnet로는 API Server, Auth Server, Redis 총 3개로 구성한다.
-3. Service는 3개로써, API Server와 Auth Server는 nodePort로, Redis는 ClusterIP로 구성한다.
-4. Ingress는 alb를 이용하여 구성한다
-5. ArgoCD와 Github를 이용하여 클러스터를 관리한다.
-6. 모니터링으로는 프로메티우스와 Grafana를 이용해 구성한다.
-7. EKS 사용자 추가하기
-8. 명령어 정리
+## List
+ - EKS로 클러스터와 노드를 생성한다.
+ - deploymnet로는 API Server, Auth Server, Redis 총 3개로 구성한다.
+ - Service는 3개로써, API Server와 Auth Server는 nodePort로, Redis는 ClusterIP로 구성한다.
+ - Ingress는 alb를 이용하여 구성한다 (ingress controller 및  ingress)
+ - ArgoCD와 Github를 이용하여 클러스터를 관리한다.
+ - 모니터링으로는 프로메티우스와 Grafana를 이용해 구성한다.
+ - EKS 사용자 추가하기
+ - 명령어 정리
 
 
 ## Start
@@ -52,7 +65,7 @@ EKS 클러스터를 생성하는 방법은 2가지가 있다.
 첫번째 방법은 콘솔을 이용하는 것이고,
 두번째 방법은 eksctl를 이용하는 방법이 있다.
 
-### Getting Start
+### EKS로 클러스터와 노드 생성
 
 ``` eksctl create cluster -f cluster.yaml ```
 
@@ -186,15 +199,138 @@ aws eks update-kubeconfig --region region-code --name my-cluster
     curl -o eks-console-full-access.yaml https://amazon-eks.s3.us-west-2.amazonaws.com/docs/eks-console-full-access.yaml
     kubectl apply -f eks-console-full-access.yaml
 
+6-2. 사용자 추가 (마스터권한)
+   eksctl create iamidentitymapping \
+  --cluster 클러스터이름 \
+  --arn arn:aws:iam::xxxxxxxxxxxx:user/유저이름 \
+  --username 유저이름 \
+  --group system:masters
 
-<<<<<<< HEAD
-=======
-## 프로젝트 목표
-일반적으로 container 배포 시 명령형 쉘스크립트로 deployment, service, ingress 들을 노출하는 것을 생각할 것입니다.
-이번 프로젝트에서는 Argo CD 라는 DevOps tool을 사용하여 CI/CD 배포를 편하게 하여 배포과정에서의 Auto Scailing, 무중단배포의 핵심 tool이라고 생각합니다. 
+6-3. 확인
 
-## 개발환경
+    eksctl get iamidentitymapping --cluster eksworkshop-eksctl
+    
+6-4. 사용자 추가에 관한 내용은 아래 블로그에 정리해 두었습니다.
 
-## SA
-eksctl delete cluster --name pj4-staging --region ap-northeast-2
->>>>>>> be022a46536c6b0f558f3a2e4c8eaf089ec6bca0
+    https://mtou.tistory.com/132
+    
+    
+### Ingress로 ALB를 설정할 때 알아둘 것
+
+```
+# k8s/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: project4
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/group.name: project4--staging
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:xxxxxxxxxxxx:certificate/104f70c8-4cbb-4873-aed9-eb9bfbeeb021
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+spec:
+  rules:
+  - host: "eks.devops-altf4.click"
+    http:
+      paths:
+      - path: /auth
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-server
+            port:
+              number: 80
+
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-server
+            port:
+              number: 80
+```
+
+인터넷에서 ingress alb를 찾아보면 첫 문장에 다음과 같이 2개로 나뉘어져 있습니다.
+``` apiVersion: networking.k8s.io/v1 ```
+``` apiVersion: extensions/v1beta1 ```
+
+https://kubernetes.io/docs/reference/using-api/deprecation-guide/
+
+ingress 에 apiVersion 중 extensions/v1beta1 는 1.14 버전에 deprecated 되었고 1.22 버전부터는 사용할 수 없으니 networking.k8s.io/v1 로 변경하라고 명시되어 있습니다.
+
+두개의 버전에 따라 변경점은 아래 블로그에서 확인할 수 있습니다.
+
+https://findmypiece.tistory.com/308
+
+### Auth server와 Redis 연결하기
+
+Auth 서버는 Redis를 호스트합니다.
+
+그런데 auth 서버는 노트포트이고, redis는 클러스터IP로 서비스 하기 때문에 host를 다른 값으로 적어주어야 합니다.
+
+즉, 로컬상에서는 Auth server의 호스트를 127.0.0.1로 주었다면 쿠버네티스 상에서는 Redis Service의 endpoint 주소로 넣어야 합니다.
+
+```
+> kubectl describe service redis-service
+Name:              redis-service
+Namespace:         default
+Labels:            <none>
+Annotations:       <none>
+Selector:          app=redis
+Type:              ClusterIP
+IP Family Policy:  SingleStack
+IP Families:       IPv4
+IP:                10.100.161.238
+IPs:               10.100.161.238
+Port:              redis  6379/TCP
+TargetPort:        6379/TCP
+Endpoints:         192.168.115.20:6379
+Session Affinity:  None
+Events:            <none>
+```
+``` kubectl describe service redis-service ``` describe 명령어를 입력해서 얻은 endpoint 주소를 auth 서버에 host로 넣어줍니다.
+
+```
+# auth-server/app.js
+const Redis = require('ioredis');
+const express = require('express');
+//const axios = require('axios');
+const bodyParser = require('body-parser');
+const port = 3005;
+
+
+
+const redis_client = new Redis({
+  host : '192.168.115.20',
+  port : '6379'
+});
+
+```
+
+### kubectl 명령어
+
+``` kubectl logs ~ ``` -> 파드 대해 로그 기록을 볼 수 있습니다.
+``` kubectl describe ~ ``` -> 디플로이먼트, 서비스에 대한 내용을 확인할 수 있습니다.
+``` kubectl get all ``` -> pod 및 service, 레플리카셋을 불러올 수 있습니다.
+
+``` kubectl describe ingress ~ ``` -> ingress에 대한 내용을 볼 수 있습니다. 
+
+    만약 다음과 같은 에러가 난다면 ingress 컨트롤러를 지우고 다음의 명령어를 추가해서 설치합니다.
+    ```Warning  FailedDeployModel  24s (x7 over 3m16s)  ingress  (combined from similar events): Failed deploy model due to AccessDeniedException: User: arn:aws:sts::060701521359:assumed-role/eksctl-staging-addon-iamserviceaccount-kube-Role1-TNFF6IU9WWLU/1653979665832449172 is not authorized to perform: waf-regional:GetWebACLForResource on resource: arn:aws:waf-regional:ap-northeast-2:060701521359:*/* with an explicit deny in a service control policy
+           status code: 400, request id: 13eb850c-1cee-4dbe-97b0-cd1916e7cbb3```
+           
+      추가명령어 :  ``` --set enableWaf=false --set enableWaf2=false --set enableShield=false ```
+      
+      https://docs.amazonaws.cn/en_us/eks/latest/userguide/aws-load-balancer-controller.html
+      
+      
+``` kubectl exec -it redis -- redis-cli ``` redis라는 이름을 가진 파드에 직접 연결해서 PING을 날려볼 수 있습니다.
+
+``` kubectl get ns ``` -> 모든 네임스페이스를 불러 옵니다.
+
+
+## clean UP
+eksctl delete cluster --name 클러스터이름 --region ap-northeast-2
+
