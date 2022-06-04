@@ -138,8 +138,8 @@ aws eks update-kubeconfig --region region-code --name my-cluster
     --name=aws-load-balancer-controller \
     --attach-policy-arn=arn:aws:iam::060701521359:policy/AWSLoadBalancerControllerIAMPolicy \
     --approve
-```
-```
+
+
     (eksctl create iamserviceaccount \
     --cluster=my-cluster \
     --namespace=kube-system \
@@ -147,9 +147,11 @@ aws eks update-kubeconfig --region region-code --name my-cluster
     --attach-policy-arn=arn:aws:iam::111122223333:policy/AWSLoadBalancerControllerIAMPolicy \
     --override-existing-serviceaccounts \
     --approve)
+
 ```
-    //no IAM OIDC provider associated with cluster란 문구가 뜨면 try 뒤 부터 복사한다음 --approve를 붙여서 실행 후 위 명령어 다시 실행
-    ```
+// no IAM OIDC provider associated with cluster란 문구가 뜨면 try 뒤 부터 복사한다음 --approve를 붙여서 실행 후 위 명령어 다시 실행
+
+```
     eksctl utils associate-iam-oidc-provider --region=ap-northeast-2 --cluster=staging --approve
 ```
 4. helm을 사용하여 AWS Load Balancer Controller 설치 
@@ -260,7 +262,9 @@ spec:
 ```
 
 인터넷에서 ingress alb를 찾아보면 첫 문장에 다음과 같이 2개로 나뉘어져 있습니다.
+
 ``` apiVersion: networking.k8s.io/v1 ```
+
 ``` apiVersion: extensions/v1beta1 ```
 
 https://kubernetes.io/docs/reference/using-api/deprecation-guide/
@@ -270,6 +274,18 @@ ingress 에 apiVersion 중 extensions/v1beta1 는 1.14 버전에 deprecated 되�
 두개의 버전에 따라 변경점은 아래 블로그에서 확인할 수 있습니다.
 
 https://findmypiece.tistory.com/308
+
+
+만약 다음과 같은 에러가 난다면 ingress 컨트롤러를 지우고 다음의 명령어를 추가해서 설치합니다.
+
+    ```Warning  FailedDeployModel  24s (x7 over 3m16s)  ingress  (combined from similar events): Failed deploy model due to AccessDeniedException: User: arn:aws:sts::060701521359:assumed-role/eksctl-staging-addon-iamserviceaccount-kube-Role1-TNFF6IU9WWLU/1653979665832449172 is not authorized to perform: waf-regional:GetWebACLForResource on resource: arn:aws:waf-regional:ap-northeast-2:060701521359:*/* with an explicit deny in a service control policy
+           status code: 400, request id: 13eb850c-1cee-4dbe-97b0-cd1916e7cbb3```
+           
+  
+추가명령어 :  ``` --set enableWaf=false --set enableWaf2=false --set enableShield=false ```
+      
+https://docs.amazonaws.cn/en_us/eks/latest/userguide/aws-load-balancer-controller.html
+
 
 ### Auth server와 Redis 연결하기
 
@@ -297,7 +313,9 @@ Endpoints:         192.168.115.20:6379
 Session Affinity:  None
 Events:            <none>
 ```
-``` kubectl describe service redis-service ``` describe 명령어를 입력해서 얻은 endpoint 주소를 auth 서버에 host로 넣어줍니다.
+``` kubectl describe service redis-service ``` 
+
+describe 명령어를 입력해서 얻은 endpoint 주소를 auth 서버에 host로 넣어줍니다.
  
  혹은 다음과 같이 찾을 수 있습니다.
  ```
@@ -321,7 +339,6 @@ subsets:
     ports:
       - port: 6379
 ```
- 
 
 ```
 # auth-server/app.js
@@ -340,6 +357,28 @@ const redis_client = new Redis({
 
 ```
 
+#### 도메인으로 접속하는 방법
+
+```
+const client = redis.createClient({
+  host: "redis.default.svc.cluster.local", 
+  //서비스이름.네임스페이스.svc.클러스터 내에서 사용가능한 최상위 도메인
+  port: 6379,
+})
+```
+```api-service.default.svc.cluster.local```
+
+```api-service```는 서비스의 이름을 뜻한다.
+
+```default```는 해당 서비스가 속한 네임스페이스이다.
+
+```svc```는 서비스를 뜻하며, 접근하고자 하는 리소스를 나타낸다.
+
+```cluster.local```은 클러스터 내에서 사용 가능한 최상위 도메인이다.
+
+간단히 말하면, 접근하고자 하는 서비스의 이름과 네임스페이스만 안다면 이렇게 조합된 도메인을 통해 해당 서비스에 접근할 수 있게 됩니다.
+
+
 ### kubectl 명령어
 
 ``` kubectl logs ~ ``` -> 파드 대해 로그 기록을 볼 수 있습니다.
@@ -347,14 +386,6 @@ const redis_client = new Redis({
 ``` kubectl get all ``` -> pod 및 service, 레플리카셋을 불러올 수 있습니다.
 
 ``` kubectl describe ingress ~ ``` -> ingress에 대한 내용을 볼 수 있습니다. 
-
-    만약 다음과 같은 에러가 난다면 ingress 컨트롤러를 지우고 다음의 명령어를 추가해서 설치합니다.
-    ```Warning  FailedDeployModel  24s (x7 over 3m16s)  ingress  (combined from similar events): Failed deploy model due to AccessDeniedException: User: arn:aws:sts::060701521359:assumed-role/eksctl-staging-addon-iamserviceaccount-kube-Role1-TNFF6IU9WWLU/1653979665832449172 is not authorized to perform: waf-regional:GetWebACLForResource on resource: arn:aws:waf-regional:ap-northeast-2:060701521359:*/* with an explicit deny in a service control policy
-           status code: 400, request id: 13eb850c-1cee-4dbe-97b0-cd1916e7cbb3```
-           
-      추가명령어 :  ``` --set enableWaf=false --set enableWaf2=false --set enableShield=false ```
-      
-      https://docs.amazonaws.cn/en_us/eks/latest/userguide/aws-load-balancer-controller.html
       
       
 ``` kubectl exec -it redis -- redis-cli ``` redis라는 이름을 가진 파드에 직접 연결해서 PING을 날려볼 수 있습니다.
@@ -413,5 +444,4 @@ Namespaces 란 동일한 물리 클러스터를 기반으로 하는 여러 가�
  
 
 ## clean UP
-eksctl delete cluster --name 클러스터이름 --region ap-northeast-2
-
+```eksctl delete cluster --name 클러스터이름 --region ap-northeast-2```
