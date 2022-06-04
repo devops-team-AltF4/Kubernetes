@@ -330,6 +330,36 @@ const redis_client = new Redis({
 
 ``` kubectl get ns ``` -> 모든 네임스페이스를 불러 옵니다.
 
+``` kubectl port-forward pod/auth-server-76ffb98979-cfmmc 3005:3005``` -> 파드를 포트포워딩으로 로컬호스트상에 노출시킵니다.
+
+
+### ArgoCD 설치법
+
+ArgoCD를 설치하는 법은 ArgoCD 홈페이지를 참고하길 바랍니다.
+https://argo-cd.readthedocs.io/en/stable/getting_started/
+
+그러나 githube의 프라이빗 레파지토리에 연결하기 위해서는 pub키가 필요합니다.
+
+ssh키는 id_ed25519가 필요합니다.
+
+키 설치는 다음에서 확인할 수 있습니다.
+
+https://gist.github.com/hrdtbs/ba50868d7d608b89f958fe32dc35fdd4
+
+생성한 pub키를 깃허브 setting -> Deploy keys 에 등록합니다.
+
+프라이빗 레파지토리에 연결하려면 다음과 같은 명령어를 입력합니다.
+
+```argocd repo add git@레파지토리 --ssh-private-key-path ~/.ssh/id_ed25519 --name id_ed25519 ```
+
+예시
+```argocd repo add git@github.com:devops-team-AltF4/Kubernetes.git --ssh-private-key-path ~/.ssh/id_ed25519 --name id_ed25519```
+
+**본 레파지토리 처럼 k8s안에 deployment, service, ingress 들을 넣어넣고 생성하시길 바랍니다. argoCD에서 path설정할 때 레파지토리 안의 폴더만 볼 수 있게 등록하기 위함입니다. **
+
+
+
+
 
 ## clean UP
 eksctl delete cluster --name 클러스터이름 --region ap-northeast-2
