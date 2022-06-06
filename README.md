@@ -291,7 +291,7 @@ https://docs.amazonaws.cn/en_us/eks/latest/userguide/aws-load-balancer-controlle
 
 Auth 서버는 Redis를 호스트합니다.
 
-그런데 auth 서버는 노트포트이고, redis는 클러스터IP로 서비스 하기 때문에 host를 다른 값으로 적어주어야 합니다.
+그런데 auth 서버는 NodePort이고, redis는 ClusterIP로 서비스 하기 때문에 host를 다른 값으로 적어주어야 합니다.
 
 즉, 로컬상에서는 Auth server의 호스트를 127.0.0.1로 주었다면 쿠버네티스 상에서는 Redis Service의 endpoint 주소로 넣어야 합니다.
 
