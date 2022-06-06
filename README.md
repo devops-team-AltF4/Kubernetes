@@ -2,7 +2,9 @@
 
 ## 프로젝트 설명
 AWS에서 제공하는 쿠버네티스 환경 Amazon Elastic Kubernetes Service(Amazon EKS)에서 클러스터와 노드를 구성합니다.
+
 Github main branch에 푸쉬하게 되면 ArgoCD가 Pull해와서 Kubernetes에 애플리케이션을 배포하게 됩니다.
+
 본 프로젝트에서는 EKS 사용법과 Ingress로 ALB를 설정할 때 겪은 트러블 슈팅, Auth Server와 Redis를 연결시켜주는 방법, kubectl 관련 명령어, 사용자 추가 방법 들을 
 알아보고 적용시켜 staging 환경에서의 EKS를 구성하는 것이 목표입니다.
 
@@ -11,6 +13,25 @@ Github main branch에 푸쉬하게 되면 ArgoCD가 Pull해와서 Kubernetes에 
 ![image](https://user-images.githubusercontent.com/50416571/171988310-031d53b2-dd20-45e0-be20-65d4964adaaa.png)
 
 
+## INDEX
+* [USE](#use)
+* [구성](#구성)
+* [Project Explanation](#project-explanation)
+* [Start](#start)
+* [EKS로 클러스터와 노드 생성](#eks로-클러스터와-노드-생성)
+* [ekctl 설치 ~ alb설치 과정](#ekctl-설치--alb설치-과정)
+  * [1. kctl-설치](#1-ekctl-설치)
+  * [2. eks 클러스터 및 노드 생성](#2-eks-클러스터-및-노드-생성)
+  * [3. aws load balancer controller 설치](#3-aws-load-balancer-controller-설치)
+  * [4. helm을 사용하여 aws load balancer controller 설치](#4-helm을-사용하여-aws-load-balancer-controller-설치)
+  * [5. 서브넷 태그 추가](#5-서브넷---public-private-태그-추가)
+  * [6. 클러스터에 대한 iam 사용자 및 RBAC 설정](#6-클러스터에-대한-iam-사용자-및-역할-액세스-사용-설정)
+* [Ingress로 alb를 설정할 때 알아둘 것 ](#ingress로-alb를-설정할-때-알아둘-것)
+* [Auth-Server와 redis 연결하기](#auth-server와-redis-연결하기)
+* [kubectl 명령어 사용하기](#kubectl-명령어)
+* [ArgoCD 설치하기](#argocd-설치법)
+* [namespace](#namespace)
+* [clean up](#clean-up)
 
 ## USE
 1. Kubernetes
@@ -49,7 +70,6 @@ Github main branch에 푸쉬하게 되면 ArgoCD가 Pull해와서 Kubernetes에 
 ```
 ## Project Explanation
 
-## List
  - EKS로 클러스터와 노드를 생성한다.
  - deploymnet로는 API Server, Auth Server, Redis 총 3개로 구성한다.
  - Service는 3개로써, API Server와 Auth Server는 nodePort로, Redis는 ClusterIP로 구성한다.
@@ -94,137 +114,178 @@ make-cluster.yaml을 실행시켜 원하는대로 노드와 권한, vpc 등을 �
 ``` kubectl apply -f make-cluster.yaml ```
 
 ### ekctl 설치 ~ alb설치 과정
-1. ekctl 설치 : https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/eksctl.html
+#### 1. ekctl 설치 
+
+
+> [참조](https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/eksctl.html)
+
+
 1-1. ekctl 다운
-   curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+
+```
+curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+
+```
 
 1-2. 압축 해제된 이진파일 옮기기
-   sudo mv /tmp/eksctl /usr/local/bin
+```
+sudo mv /tmp/eksctl /usr/local/bin
+```
 
 1-3. 버전확인
-    eksctl version
+```
+eksctl version
+```
 
-2. eks 클러스터 및 노드 생성 : https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/getting-started-eksctl.html
+#### 2. eks 클러스터 및 노드 생성 
+
+> [참조](https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/getting-started-eksctl.html)
+
 2-1. 생성(생성되는데 시간이 조금 걸림)
-    eksctl create cluster --name staging --region ap-northeast-2
-    (eksctl create cluster --name my-cluster --region region-code)
-
+```
+eksctl create cluster --name staging --region ap-northeast-2
+(eksctl create cluster --name my-cluster --region region-code)
+```
 2-2. 리소스 보기(클러스터 노드 확인)
-    kubectl get nodes -o wide
+```
+kubectl get nodes -o wide
+```
 
 2-3. 클러스터에 실행중인 워크로드 확인
-    kubectl get pods --all-namespaces -o wide
+```
+kubectl get pods --all-namespaces -o wide
+```
 
 2-4. 클러스터와 통신
+```
 aws eks update-kubeconfig --region region-code --name my-cluster
+```
 
-3. AWS Load Balancer Controller 설치 : https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/aws-load-balancer-controller.html
+#### 3. AWS Load Balancer Controller 설치
+
+> [참조](https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/aws-load-balancer-controller.html)
    
 3-1. IAM 정책 생성
-    curl -o iam_policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.4.0/docs/install/iam_policy.json
+```
+curl -o iam_policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.4.0/docs/install/iam_policy.json
+```
 
 3-2. IAM 정책 만들기
 ```
-    aws iam create-policy \
-    --policy-name AWSLoadBalancerControllerIAMPolicy \
-    --policy-document file://iam_policy.json
+aws iam create-policy \
+--policy-name AWSLoadBalancerControllerIAMPolicy \
+--policy-document file://iam_policy.json
+    
 ```
 3-3. eksctl을 이용해 kubectl을 사용하여 IAM 역할을 생성하고 AWS 로드 밸런서 컨트롤러의 kube-system 네임스페이스에 aws-load-balancer-controller라는 Kubernetes 서비스 계정을 추가
 
 ```
-    eksctl create iamserviceaccount \
-    --cluster=staging \
-    --namespace=kube-system \
-    --name=aws-load-balancer-controller \
-    --attach-policy-arn=arn:aws:iam::060701521359:policy/AWSLoadBalancerControllerIAMPolicy \
+eksctl create iamserviceaccount \
+--cluster=staging \
+--namespace=kube-system \
+--name=aws-load-balancer-controller \
+--attach-policy-arn=arn:aws:iam::060701521359:policy/AWSLoadBalancerControllerIAMPolicy \
     --approve
 
 
-    (eksctl create iamserviceaccount \
-    --cluster=my-cluster \
-    --namespace=kube-system \
-    --name=aws-load-balancer-controller \
-    --attach-policy-arn=arn:aws:iam::111122223333:policy/AWSLoadBalancerControllerIAMPolicy \
-    --override-existing-serviceaccounts \
-    --approve)
+(eksctl create iamserviceaccount \
+--cluster=my-cluster \
+--namespace=kube-system \
+--name=aws-load-balancer-controller \
+--attach-policy-arn=arn:aws:iam::111122223333:policy/AWSLoadBalancerControllerIAMPolicy \
+--override-existing-serviceaccounts \
+--approve)
 
 ```
-// no IAM OIDC provider associated with cluster란 문구가 뜨면 try 뒤 부터 복사한다음 --approve를 붙여서 실행 후 위 명령어 다시 실행
+
+
+> ⚠️ **Warning**  
+```no IAM OIDC provider associated with cluster```  
+문구가 뜨면 try 뒤 부터 복사한다음 --approve를 붙여서 실행 후 위 명령어 다시 실행합니다
+
 
 ```
-    eksctl utils associate-iam-oidc-provider --region=ap-northeast-2 --cluster=staging --approve
+eksctl utils associate-iam-oidc-provider --region=ap-northeast-2 --cluster=staging --approve
 ```
-4. helm을 사용하여 AWS Load Balancer Controller 설치 
+
+
+#### 4. helm을 사용하여 AWS Load Balancer Controller 설치 
    
 4-1. eks-charts 리포지토리 추가
 ```
-    helm repo add eks https://aws.github.io/eks-charts
+helm repo add eks https://aws.github.io/eks-charts
 ```
 4-2. 최신 차트가 적용되도록 로컬 리포지토리를 업데이트
-    helm repo update
+```
+helm repo update
+```
+
 
 4-3. aws 로드밸런서 컨트롤러 설치
 ```
-    helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
-    -n default \
-    --set clusterName=staging \
-    --set serviceAccount.create=false \
-    --set serviceAccount.name=aws-load-balancer-controller 
-```
-```
-    ( helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
-    -n kube-system \
-    --set clusterName=cluster-name \
-    --set serviceAccount.create=false \
-    --set serviceAccount.name=aws-load-balancer-controller )
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+-n default \
+--set clusterName=staging \
+--set serviceAccount.create=false \
+--set serviceAccount.name=aws-load-balancer-controller 
+
+( helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+-n kube-system \
+--set clusterName=cluster-name \
+--set serviceAccount.create=false \
+--set serviceAccount.name=aws-load-balancer-controller )
 ```
 4-4. 다음과 같이 떠야함
 ```
-    > kubectl get deployment -n kube-system aws-load-balancer-controller
-        NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
-        aws-load-balancer-controller   2/2     2            2           47s
+> kubectl get deployment -n kube-system aws-load-balancer-controller
+    NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+    aws-load-balancer-controller   2/2     2            2           47s
 ```
-5. 서브넷 -> public, private 태그 추가
-   
-    키 - kubernetes.io/cluster/pj4-staging
-    값 - shared 또는 owned
+#### 5. 서브넷 -> public, private 태그 추가
+```
+키 - kubernetes.io/cluster/pj4-staging
+값 - shared 또는 owned
 
-    (키 - kubernetes.io/cluster/cluster-name)
-    (값 - shared 또는 owned)
+(키 - kubernetes.io/cluster/cluster-name)
+(값 - shared 또는 owned)
+```
 
 5-1. 프라이빗 서브넷에 태그 추가
-
-    키 - kubernetes.io/role/internal-elb
-    값 - 1
-
-5-2. 퍼블릭 서브넷에 태그 추가
-
-    키 - kubernetes.io/role/elb
-    값 - 1
-
-6. 클러스터에 대한 IAM 사용자 및 역할 액세스 사용 설정 : https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/add-user-role.html
 ```
-    curl -o eks-console-full-access.yaml https://amazon-eks.s3.us-west-2.amazonaws.com/docs/eks-console-full-access.yaml
-    kubectl apply -f eks-console-full-access.yaml
+키 - kubernetes.io/role/internal-elb
+값 - 1
+```
+5-2. 퍼블릭 서브넷에 태그 추가
+```
+키 - kubernetes.io/role/elb
+값 - 1
+```
+
+#### 6. 클러스터에 대한 IAM 사용자 및 역할 액세스 사용 설정
+>[참조](https://docs.aws.amazon.com/ko_kr/eks/latest/userguide/add-user-role.html)
+
+```
+curl -o eks-console-full-access.yaml https://amazon-eks.s3.us-west-2.amazonaws.com/docs/eks-console-full-access.yaml
+kubectl apply -f eks-console-full-access.yaml
 ```
 6-2. 사용자 추가 RBAC(마스터권한)
 ```
-   eksctl create iamidentitymapping \
-  --cluster 클러스터이름 \
-  --arn arn:aws:iam::xxxxxxxxxxxx:user/유저이름 \
-  --username 유저이름 \
-  --group system:masters
+eksctl create iamidentitymapping \
+--cluster 클러스터이름 \
+--arn arn:aws:iam::xxxxxxxxxxxx:user/유저이름 \
+--username 유저이름 \
+--group system:masters
 ```
 6-3. 확인
 ```
-    eksctl get iamidentitymapping --cluster eksworkshop-eksctl
+eksctl get iamidentitymapping --cluster eksworkshop-eksctl
 ``` 
 6-4. 사용자 추가에 관한 내용은 아래 블로그에 정리해 두었습니다.
 
-    https://mtou.tistory.com/132
+[Link](https://mtou.tistory.com/132)
     
     
-### Ingress로 ALB를 설정할 때 알아둘 것
+## Ingress로 ALB를 설정할 때 알아둘 것
 
 ```
 # k8s/ingress.yaml
@@ -275,7 +336,7 @@ ingress 에 apiVersion 중 extensions/v1beta1 는 1.14 버전에 deprecated 되�
 
 https://findmypiece.tistory.com/308
 
-
+> ⚠️ **Warning**  
 만약 다음과 같은 에러가 난다면 ingress 컨트롤러를 지우고 다음의 명령어를 추가해서 설치합니다.
 
     ```Warning  FailedDeployModel  24s (x7 over 3m16s)  ingress  (combined from similar events): Failed deploy model due to AccessDeniedException: User: arn:aws:sts::060701521359:assumed-role/eksctl-staging-addon-iamserviceaccount-kube-Role1-TNFF6IU9WWLU/1653979665832449172 is not authorized to perform: waf-regional:GetWebACLForResource on resource: arn:aws:waf-regional:ap-northeast-2:060701521359:*/* with an explicit deny in a service control policy
@@ -284,16 +345,18 @@ https://findmypiece.tistory.com/308
   
 추가명령어 :  ``` --set enableWaf=false --set enableWaf2=false --set enableShield=false ```
       
-https://docs.amazonaws.cn/en_us/eks/latest/userguide/aws-load-balancer-controller.html
+[참조](https://docs.amazonaws.cn/en_us/eks/latest/userguide/aws-load-balancer-controller.html)
 
 
 ### Auth server와 Redis 연결하기
+
+> (1) Endpoint를 직접 하드코딩해서 넣어주는 방법 
 
 Auth 서버는 Redis를 호스트합니다.
 
 그런데 auth 서버는 NodePort이고, redis는 ClusterIP로 서비스 하기 때문에 host를 다른 값으로 적어주어야 합니다.
 
-즉, 로컬상에서는 Auth server의 호스트를 127.0.0.1로 주었다면 쿠버네티스 상에서는 Redis Service의 endpoint 주소로 넣어야 합니다.
+<span style="color:yellow">즉, 로컬상에서는 Auth server의 호스트를 127.0.0.1로 주었다면 쿠버네티스 상에서는 Redis Service의 endpoint 주소로 넣어야 합니다.</span>
 
 ```
 > kubectl describe service redis-service
@@ -325,7 +388,7 @@ kubernetes   192.168.49.2:8443   54m
 redis        172.17.0.3:6379     22s
 ```
  
-이때 redis의 endpoint는 바뀔 수 있으니 endpoint를 고정시켜줄 수 있습니다.
+> (2) redis의 endpoint는 바뀔 수 있으니 endpoint를 고정시켜줄 수 있습니다.
  ```
  //redis-endpoint.yaml
  apiVersion: v1
@@ -357,7 +420,7 @@ const redis_client = new Redis({
 
 ```
 
-#### 도메인으로 접속하는 방법
+> (3) 도메인으로 auth서버와 Redis를 연결 시 킬 수도 있습니다
 
 ```
 const client = redis.createClient({
@@ -381,8 +444,10 @@ const client = redis.createClient({
 
 ### kubectl 명령어
 
-``` kubectl logs ~ ``` -> 파드 대해 로그 기록을 볼 수 있습니다.
+``` kubectl logs ~ ```  -> 파드 대해 로그 기록을 볼 수 있습니다.
+
 ``` kubectl describe ~ ``` -> 디플로이먼트, 서비스에 대한 내용을 확인할 수 있습니다.
+
 ``` kubectl get all ``` -> pod 및 service, 레플리카셋을 불러올 수 있습니다.
 
 ``` kubectl describe ingress ~ ``` -> ingress에 대한 내용을 볼 수 있습니다. 
@@ -397,12 +462,13 @@ const client = redis.createClient({
 
 ### ArgoCD 설치법
 
-ArgoCD를 설치하는 법은 ArgoCD 홈페이지를 참고하길 바랍니다.
-https://argo-cd.readthedocs.io/en/stable/getting_started/
+ArgoCD를 설치하는 법은 ArgoCD 홈페이지를 참고하길 바랍니다.  
+[ArgoCD 공식홈페이지](https://argo-cd.readthedocs.io/en/stable/getting_started/)
 
 그러나 githube의 프라이빗 레파지토리에 연결하기 위해서는 pub키가 필요합니다.
 
-ssh키는 id_ed25519가 필요합니다.
+> ⚠️ **Warning**  
+**<span style="color:yellow"> ssh키는 id_ed25519가 필요합니다. </span>**
 
 키 설치는 다음에서 확인할 수 있습니다.
 
@@ -412,12 +478,18 @@ https://gist.github.com/hrdtbs/ba50868d7d608b89f958fe32dc35fdd4
 
 프라이빗 레파지토리에 연결하려면 다음과 같은 명령어를 입력합니다.
 
-```argocd repo add git@레파지토리 --ssh-private-key-path ~/.ssh/id_ed25519 --name id_ed25519 ```
+```
+argocd repo add git@레파지토리 --ssh-private-key-path ~/.ssh/id_ed25519 --name id_ed25519 
+```
 
-예시
-```argocd repo add git@github.com:devops-team-AltF4/Kubernetes.git --ssh-private-key-path ~/.ssh/id_ed25519 --name id_ed25519```
+예시  
+```
+argocd repo add git@github.com:devops-team-AltF4/Kubernetes.git --ssh-private-key-path ~/.ssh/id_ed25519 --name id_ed25519
+```
 
-**본 레파지토리 처럼 k8s안에 deployment, service, ingress 들을 넣어넣고 생성하시길 바랍니다. argoCD에서 path설정할 때 레파지토리 안의 폴더만 볼 수 있게 등록하기 위함입니다. **
+**본 레파지토리 처럼 k8s안에 deployment, service, ingress 들을 넣어넣고 생성하시길 바랍니다.**
+
+argoCD에서 path설정할 때 레파지토리 안의 폴더만 볼 수 있게 등록하기 위함입니다. 
 
 
 ## namespace
@@ -444,4 +516,6 @@ Namespaces 란 동일한 물리 클러스터를 기반으로 하는 여러 가�
  
 
 ## clean UP
-```eksctl delete cluster --name 클러스터이름 --region ap-northeast-2```
+```
+eksctl delete cluster --name 클러스터이름 --region ap-northeast-2
+```
